@@ -1,0 +1,6 @@
+             List of tables
+ Schema |    Name    | Type  |  Owner   
+--------+------------+-------+----------
+ public | books_read | table | postgres
+(1 row)
+
