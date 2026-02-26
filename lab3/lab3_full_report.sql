@@ -1,6 +1,9 @@
 -- Lab 3 Full Report
--- Author: Aisha Noorr
--- Roll Number: YOUR_ROLL_NUMBER
+-- Author: Aisha Noor
+-- Roll Number: 03
+-- Data Science
+-- semester: 4rth
+-- Subject: Database System
 -- Date: 26-Feb-2026
 -- Description: Aggregation, Window Functions, CTEs, Performance Analysis, AI Prompting, and Reflection
 
