@@ -1,0 +1,269 @@
+=========================================
+LAB 4: SQL JOIN Exercises – Complete Report
+Student: Aisha Noor
+Course: Database Systems Lab
+Date: 5/march/2026
+=========================================
+
+-------------------------
+1. SQL QUERIES (All 10)
+-------------------------
+
+-- Query 1 — Orders with Customer Names
+SELECT o.order_id,
+       c.name AS customer_name,
+       c.city,
+       o.order_date,
+       o.status,
+       o.total_amount
+FROM orders o
+INNER JOIN customers c
+ON o.customer_id = c.customer_id
+ORDER BY o.order_date DESC;
+
+-- Query 2 — Full Order Receipt (4-table join)
+SELECT c.name AS customer,
+       o.order_id,
+       o.order_date,
+       o.status,
+       p.product_name,
+       p.category,
+       oi.quantity,
+       oi.unit_price,
+       oi.quantity * oi.unit_price AS line_total
+FROM order_items oi
+INNER JOIN orders o
+ON oi.order_id = o.order_id
+INNER JOIN customers c
+ON o.customer_id = c.customer_id
+INNER JOIN products p
+ON oi.product_id = p.product_id
+ORDER BY o.order_id, p.category;
+
+-- Query 3 — Customers Who Never Ordered
+SELECT c.customer_id,
+       c.name,
+       c.email,
+       c.city,
+       c.signup_date
+FROM customers c
+LEFT JOIN orders o
+ON c.customer_id = o.customer_id
+WHERE o.order_id IS NULL
+ORDER BY c.signup_date;
+
+-- Query 4 — Products Never Ordered
+SELECT p.product_id,
+       p.product_name,
+       p.category,
+       p.price,
+       p.stock_qty
+FROM products p
+LEFT JOIN order_items oi
+ON p.product_id = oi.product_id
+WHERE oi.item_id IS NULL
+ORDER BY p.category;
+
+-- Query 5 — Revenue by Customer
+SELECT c.name,
+       c.city,
+       COUNT(o.order_id) AS total_orders,
+       COALESCE(SUM(o.total_amount),0) AS total_spent
+FROM customers c
+LEFT JOIN orders o
+ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.name, c.city
+ORDER BY total_spent DESC;
+
+-- Query 6 — Best Selling Products
+SELECT p.product_name,
+       p.category,
+       p.price,
+       SUM(oi.quantity) AS units_sold,
+       SUM(oi.quantity * oi.unit_price) AS total_revenue
+FROM products p
+INNER JOIN order_items oi
+ON p.product_id = oi.product_id
+GROUP BY p.product_name, p.category, p.price
+ORDER BY units_sold DESC
+LIMIT 5;
+
+-- Query 7 — City Level Sales Report
+SELECT c.city,
+       COUNT(DISTINCT c.customer_id) AS num_customers,
+       COUNT(DISTINCT o.order_id) AS num_orders,
+       SUM(o.total_amount) AS total_revenue,
+       ROUND(AVG(o.total_amount),2) AS avg_order_value
+FROM customers c
+INNER JOIN orders o
+ON c.customer_id = o.customer_id
+GROUP BY c.city
+ORDER BY total_revenue DESC;
+
+-- Query 8 — Delivered Orders from 2025
+SELECT c.name AS customer,
+       c.city,
+       COUNT(DISTINCT p.product_id) AS distinct_products_bought,
+       SUM(oi.quantity) AS total_items,
+       SUM(oi.quantity * oi.unit_price) AS total_spent
+FROM order_items oi
+INNER JOIN orders o
+ON oi.order_id = o.order_id
+INNER JOIN customers c
+ON o.customer_id = c.customer_id
+INNER JOIN products p
+ON oi.product_id = p.product_id
+WHERE o.status = 'delivered'
+AND o.order_date >= '2025-01-01'
+GROUP BY c.customer_id, c.name, c.city
+ORDER BY total_spent DESC;
+
+-- Query 9 — Session and Purchase Behaviour
+SELECT c.name,
+       c.city,
+       COUNT(DISTINCT s.session_id) AS total_sessions,
+       COUNT(DISTINCT o.order_id) AS total_orders,
+       COALESCE(SUM(DISTINCT o.total_amount),0) AS total_spent,
+       CASE
+           WHEN COUNT(DISTINCT o.order_id) > 0 THEN 'Converted'
+           ELSE 'Not Converted'
+       END AS customer_status
+FROM customers c
+INNER JOIN user_sessions s
+ON c.customer_id = s.customer_id
+LEFT JOIN orders o
+ON c.customer_id = o.customer_id
+AND o.status = 'delivered'
+GROUP BY c.customer_id, c.name, c.city
+ORDER BY total_sessions DESC;
+
+-- Query 10 — FULL OUTER JOIN Data Audit
+SELECT c.customer_id AS customer_table_id,
+       c.name,
+       s.customer_id AS session_table_cust_id,
+       COUNT(s.session_id) AS session_count,
+       CASE
+           WHEN c.customer_id IS NULL THEN 'Orphaned session — no customer record'
+           WHEN s.customer_id IS NULL THEN 'Customer with no sessions'
+           ELSE 'Matched'
+       END AS audit_status
+FROM customers c
+FULL OUTER JOIN user_sessions s
+ON c.customer_id = s.customer_id
+GROUP BY c.customer_id, c.name, s.customer_id
+ORDER BY audit_status, c.name;
+
+-------------------------
+2. QUERY PERFORMANCE ANALYSIS
+-------------------------
+
+EXPLAIN ANALYZE
+SELECT c.name,
+       o.order_id,
+       o.total_amount
+FROM orders o
+INNER JOIN customers c
+ON o.customer_id = c.customer_id
+WHERE o.status = 'delivered';
+
+-- Output
+Nested Loop  (cost=0.14..9.69 rows=1 width=238) (actual time=0.074..0.150 rows=20 loops=1)
+  -> Seq Scan on orders o  (cost=0.00..1.38 rows=1 width=24) (actual time=0.027..0.041 rows=20 loops=1)
+       Filter: ((status)::text = 'delivered'::text)
+       Rows Removed by Filter: 10
+  -> Index Scan using customers_pkey on customers c  (cost=0.14..8.16 rows=1 width=222) (actual time=0.004..0.004 rows=1 loops=20)
+       Index Cond: (customer_id = o.customer_id)
+Planning Time: 1.958 ms
+Execution Time: 0.318 ms
+
+-- Explanation
+Seq Scan → PostgreSQL scans the orders table to find delivered orders.
+Rows Removed by Filter → 10 orders did not match the filter.
+Index Scan → Primary key index on customers used to find matching rows.
+Nested Loop → Joins each order to corresponding customer.
+Performance Insight → Query runs efficiently; indexes used; fast execution.
+Conclusion → EXPLAIN ANALYZE helps understand query execution and optimize performance.
+
+-------------------------
+3. ER DIAGRAM
+-------------------------
+
+Tables:
+customers, orders, order_items, products, user_sessions
+
+Relationships:
+- customers (1) → (many) orders
+- orders (1) → (many) order_items
+- products (1) → (many) order_items
+- customers (1) → (many) user_sessions
+
+Explanation:
+- Each customer can have multiple orders and sessions.
+- Each order can contain multiple products via order_items.
+- Each product can appear in multiple orders through order_items.
+- This structure avoids data duplication and ensures referential integrity.
+- ER diagram ensures the database is normalized and easy to query.
+
+-------------------------
+4. NORMALIZATION REFLECTION
+-------------------------
+
+Table: user_sessions
+
+Primary Key: session_id
+
+Functional dependencies:
+- session_id → customer_id
+- session_id → login_time, logout_time
+
+Observations:
+- No repeating groups in the table.
+- No derived columns (all stored values are atomic).
+- All non-key attributes depend fully on the primary key.
+- No transitive dependencies exist.
+
+Conclusion:
+- user_sessions table is in **Third Normal Form (3NF)**.
+- Normalization ensures efficient storage, avoids redundancy, and improves query performance.
+
+-------------------------
+5. AI LEARNING LOG (Detailed)
+-------------------------
+
+1️ **Debugging Joins**
+- Observed duplicate rows caused by multiple joins.
+- Learned to use DISTINCT and proper JOIN conditions to avoid duplication.
+
+2️ **INNER JOIN vs LEFT JOIN**
+- INNER JOIN returns only matching rows.
+- LEFT JOIN includes all rows from left table and fills NULL for unmatched right table.
+- This is crucial for analyzing customers who never ordered.
+
+3️ **Query Optimization**
+- Learned EXPLAIN ANALYZE to check query cost and execution plan.
+- Found that using indexed columns (customer_id) improves performance.
+- Learned how PostgreSQL chooses Nested Loop vs Hash Join depending on table size.
+
+-------------------------
+6. FINAL REFLECTION (Detailed)
+-------------------------
+
+- **INNER JOIN vs LEFT JOIN:**  
+  INNER JOIN is used when we need only matching rows between two tables.  
+  LEFT JOIN is used when we want all rows from the left table regardless of matches in the right table.  
+
+- **Insights from Lab 4:**  
+  - Using joins helped identify customers who never ordered, products never sold, and city-wise revenue.  
+  - Learned how to calculate total revenue per customer and best-selling products.  
+  - Session analysis allowed understanding user engagement and purchase conversion.  
+  - FULL OUTER JOIN helped audit data inconsistencies (orphaned sessions or customers without activity).  
+
+- **Performance Awareness:**  
+  EXPLAIN ANALYZE showed how PostgreSQL executes queries internally. Learned that using **indexes** significantly reduces query time.  
+
+- **Overall Learning:**  
+  - Structuring queries efficiently improves performance.  
+  - Proper ER design and normalization prevents redundant data and improves maintainability.  
+  - Lab 4 strengthened SQL JOIN concepts, aggregation, and database analysis skills.  
+  - Extended reflections, AI logs, and analysis help understand the real-world importance of data relationships.
+
